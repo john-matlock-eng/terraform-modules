@@ -111,12 +111,12 @@ jobs:
           cd ${{ matrix.module_path }}
           terraform test
       
-          - name: Generate Terraform Docs
-          run: |
-            set -e
-            cd ${{ matrix.module_path }}
-            terraform-docs markdown table . > GENERATED.md
-        
+      - name: Generate Terraform Docs
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          terraform-docs markdown table . > GENERATED.md
+      
       - name: Check Documentation Changes
         run: |
           set -e
