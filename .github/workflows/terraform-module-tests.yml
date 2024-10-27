@@ -69,11 +69,13 @@ jobs:
 
       - name: Run Checkov
         id: checkov
+        shell: bash
         run: |
           set -e
           cd ${{ matrix.module_path }}
-          checkov -d . --framework terraform -o json > checkov_results.json
-          FAILED_CHECKS=$(jq '.summary.failed' checkov_results.json)
+          CHECKOV_OUTPUT=$(checkov -d . --framework terraform)
+          echo "$CHECKOV_OUTPUT"
+          FAILED_CHECKS=$(echo "$CHECKOV_OUTPUT" | grep -Eo 'Failed checks: [0-9]+' | awk '{print $3}')
           if [ "$FAILED_CHECKS" -gt 0 ]; then
             echo "Checkov found $FAILED_CHECKS failed checks"
             exit 1
