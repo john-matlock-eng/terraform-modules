@@ -83,7 +83,7 @@ jobs:
         id: checkov
         run: |
           cd ${{ matrix.module_path }}
-          checkov -d . --framework terraform --soft-fail false
+          checkov -d . --framework terraform
           if [ $? -ne 0 ]; then
             echo "Checkov security checks failed"
             exit 1
