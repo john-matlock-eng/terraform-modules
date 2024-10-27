@@ -72,7 +72,14 @@ jobs:
         run: |
           set -e
           cd ${{ matrix.module_path }}
-          checkov -d . --framework terraform --exit-code 1
+          checkov -d . --framework terraform -o json > checkov_results.json
+          FAILED_CHECKS=$(jq '.summary.failed' checkov_results.json)
+          if [ "$FAILED_CHECKS" -gt 0 ]; then
+            echo "Checkov found $FAILED_CHECKS failed checks"
+            exit 1
+          else
+            echo "No failed checks found by Checkov."
+          fi
 
       - name: Run Terraform Tests
         run: |
