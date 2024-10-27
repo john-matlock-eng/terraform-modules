@@ -68,10 +68,11 @@ jobs:
           terraform validate
 
       - name: Run Checkov
+        id: checkov
         run: |
           set -e
           cd ${{ matrix.module_path }}
-          checkov -d . --framework terraform
+          checkov -d . --framework terraform --exit-code 1
 
       - name: Run Terraform Tests
         run: |
