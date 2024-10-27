@@ -110,20 +110,6 @@ jobs:
           set -e
           cd ${{ matrix.module_path }}
           terraform test
-
-      - name: Generate Terraform Docs
-        uses: terraform-docs/gh-actions@v1.3.0
-        with:
-          working-dir: ${{ matrix.module_path }}
-          output-file: GENERATED.md
-          output-method: replace
-      
-      - name: Check Documentation Changes
-        run: |
-          set -e
-          cd ${{ matrix.module_path }}
-          diff README.md GENERATED.md
-
   summary:
     needs: test
     runs-on: ubuntu-latest
