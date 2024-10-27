@@ -23,40 +23,81 @@ jobs:
   test:
     needs: discover-modules
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
+      fail-fast: true
       matrix:
         module_path: ${{ fromJson(needs.discover-modules.outputs.module_paths) }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.TEST_AWS_ACCOUNT_ID }}:role/github-actions-terraform-test
+          aws-region: us-west-2
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.7.0"
 
       - name: Install Checkov
         run: |
           python -m pip install --upgrade pip
           pip install checkov
 
-      - name: Run Checkov for ${{ matrix.module_path }}
-        run: |
-          checkov -d ${{ matrix.module_path }} --framework terraform
-
-      - name: Run Terraform Init for ${{ matrix.module_path }}
-        run: |
-          cd ${{ matrix.module_path }}
-          terraform init
-
-      - name: Run Terraform Tests for ${{ matrix.module_path }}
-        run: |
-          cd ${{ matrix.module_path }}
-          terraform test
-
-      - name: Run Terraform Format Check for ${{ matrix.module_path }}
+      - name: Terraform Format Check
+        id: fmt
         run: |
           cd ${{ matrix.module_path }}
           terraform fmt -check
+          if [ $? -ne 0 ]; then
+            echo "Terraform formatting check failed"
+            exit 1
+          fi
+
+      - name: Terraform Init
+        id: init
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform init
+          if [ $? -ne 0 ]; then
+            echo "Terraform initialization failed"
+            exit 1
+          fi
+
+      - name: Terraform Validate
+        id: validate
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform validate
+          if [ $? -ne 0 ]; then
+            echo "Terraform validation failed"
+            exit 1
+          fi
+
+      - name: Run Checkov
+        id: checkov
+        run: |
+          cd ${{ matrix.module_path }}
+          checkov -d . --framework terraform --soft-fail false
+          if [ $? -ne 0 ]; then
+            echo "Checkov security checks failed"
+            exit 1
+          fi
+
+      - name: Run Terraform Tests
+        id: test
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform test
+          if [ $? -ne 0 ]; then
+            echo "Terraform tests failed"
+            exit 1
+          fi
 
   summary:
     needs: test
@@ -66,9 +107,9 @@ jobs:
       - name: Check Test Results
         run: |
           if [ "${{ needs.test.result }}" == "success" ]; then
-            echo "All module tests passed successfully!"
+            echo "All checks passed successfully!"
             exit 0
           else
-            echo "Some module tests failed!"
+            echo "One or more checks failed!"
             exit 1
           fi
