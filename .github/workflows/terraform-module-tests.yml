@@ -1,0 +1,126 @@
+name: Terraform Module Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  discover-modules:
+    runs-on: ubuntu-latest
+    outputs:
+      module_paths: ${{ steps.set-matrix.outputs.module_paths }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - id: set-matrix
+        run: |
+          MODULES=$(find modules -type d -maxdepth 1 -mindepth 1 | jq -R -s -c 'split("\n")[:-1]')
+          echo "module_paths=${MODULES}" >> $GITHUB_OUTPUT
+
+  test:
+    needs: discover-modules
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        module_path: ${{ fromJson(needs.discover-modules.outputs.module_paths) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.LAMBDA_TEST_DEPLOYER_ARN }}
+          aws-region: "us-west-2"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          pip install checkov
+
+      - name: Install TFLint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+      - name: Terraform Format Check
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          terraform fmt -check
+
+      - name: Terraform Init
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          terraform init
+
+      - name: Terraform Validate
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          terraform validate
+
+      - name: Run TFLint
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          tflint --init
+          tflint
+
+      - name: Run Checkov
+        id: checkov
+        shell: bash
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          CHECKOV_OUTPUT=$(checkov -d . --framework terraform)
+          echo "$CHECKOV_OUTPUT"
+          FAILED_CHECKS=$(echo "$CHECKOV_OUTPUT" | grep -Eo 'Failed checks: [0-9]+' | awk '{print $3}')
+          if [ "$FAILED_CHECKS" -gt 0 ]; then
+            echo "Checkov found $FAILED_CHECKS failed checks"
+            exit 1
+          else
+            echo "No failed checks found by Checkov."
+          fi
+
+      - name: Run Trivy IaC Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'fs'
+          security-checks: 'config'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          exit-code: '1'
+          format: 'table'
+          ignore-policy: ''
+          scan-ref: ${{ matrix.module_path }}
+
+      - name: Run Terraform Tests
+        run: |
+          set -e
+          cd ${{ matrix.module_path }}
+          terraform test
+  summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check Test Results
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "All checks passed successfully!"
+            exit 0
+          else
+            echo "One or more checks failed!"
+            exit 1
+          fi
