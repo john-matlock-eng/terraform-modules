@@ -5,6 +5,11 @@ resource "aws_ecr_repository" "lambda_repo" {
   image_scanning_configuration {
     scan_on_push = true
   }
+
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = var.kms_key_arn != "" ? var.kms_key_arn : null
+  }
 }
 
 resource "aws_ecr_lifecycle_policy" "lambda_repo_policy" {

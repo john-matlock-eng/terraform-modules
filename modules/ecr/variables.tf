@@ -66,3 +66,9 @@ variable "tags" {
   description = "Tags to apply to all resources"
   default     = {}
 }
+
+variable "kms_key_arn" {
+  description = "The ARN of the KMS key to use for ECR encryption. Leave empty to use the default AWS-managed key."
+  type        = string
+  default     = ""
+}
