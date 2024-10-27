@@ -1,24 +1,3 @@
-locals {
-  default_lifecycle_policy = {
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 5 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  }
-
-  effective_lifecycle_policy = var.lifecycle_policy != null ? var.lifecycle_policy : local.default_lifecycle_policy
-}
-
 resource "aws_ecr_repository" "repo" {
   name                 = var.repository_name
   image_tag_mutability = var.image_tag_mutability
@@ -37,5 +16,5 @@ resource "aws_ecr_repository" "repo" {
 
 resource "aws_ecr_lifecycle_policy" "repo_policy" {
   repository = aws_ecr_repository.repo.name
-  policy     = jsonencode(local.effective_lifecycle_policy)
+  policy     = jsonencode(var.lifecycle_policy)
 }

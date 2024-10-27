@@ -42,8 +42,23 @@ variable "lifecycle_policy" {
       })
     }))
   })
-  description = "Lifecycle policy for the ECR repository. Leave empty to use the default policy."
-  default     = null
+  description = "Lifecycle policy for the ECR repository"
+  default = {
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 5 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 5
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  }
 }
 
 variable "tags" {
