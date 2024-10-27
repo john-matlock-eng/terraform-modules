@@ -49,10 +49,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install checkov
 
-      - name: Install tfsec
-        run: |
-          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install.sh | bash
-
       - name: Install TFLint
         run: |
           curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
@@ -97,6 +93,17 @@ jobs:
           else
             echo "No failed checks found by Checkov."
           fi
+
+      - name: Run Trivy IaC Scan
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          scan-type: 'fs'
+          security-checks: 'config'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          exit-code: '1'
+          format: 'table'
+          ignore-policy: ''
+          scan-ref: ${{ matrix.module_path }}
 
       - name: Run Terraform Tests
         run: |
