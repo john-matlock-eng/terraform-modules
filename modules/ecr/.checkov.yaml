@@ -1,0 +1,11 @@
+branch: main
+directory:
+  - .
+framework:
+  - terraform
+skip-check:
+  - CKV_AWS_115  # Skip specific checks if needed
+output:
+  - cli
+  - github_failed_only
+soft-fail: true

@@ -1,0 +1,74 @@
+name: Terraform Module Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  discover-modules:
+    runs-on: ubuntu-latest
+    outputs:
+      module_paths: ${{ steps.set-matrix.outputs.module_paths }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - id: set-matrix
+        run: |
+          MODULES=$(find modules -type d -maxdepth 1 -mindepth 1 | jq -R -s -c 'split("\n")[:-1]')
+          echo "module_paths=${MODULES}" >> $GITHUB_OUTPUT
+
+  test:
+    needs: discover-modules
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module_path: ${{ fromJson(needs.discover-modules.outputs.module_paths) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          pip install checkov
+
+      - name: Run Checkov for ${{ matrix.module_path }}
+        run: |
+          checkov -d ${{ matrix.module_path }} --framework terraform
+
+      - name: Run Terraform Init for ${{ matrix.module_path }}
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform init
+
+      - name: Run Terraform Tests for ${{ matrix.module_path }}
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform test
+
+      - name: Run Terraform Format Check for ${{ matrix.module_path }}
+        run: |
+          cd ${{ matrix.module_path }}
+          terraform fmt -check
+
+  summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check Test Results
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "All module tests passed successfully!"
+            exit 0
+          else
+            echo "Some module tests failed!"
+            exit 1
+          fi
