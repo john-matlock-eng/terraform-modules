@@ -42,23 +42,8 @@ variable "lifecycle_policy" {
       })
     }))
   })
-  description = "Lifecycle policy for the ECR repository"
-  default = {
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 30 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 30
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  }
+  description = "Lifecycle policy for the ECR repository. Leave empty to use the default policy."
+  default     = null
 }
 
 variable "tags" {
